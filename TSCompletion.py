@@ -36,7 +36,6 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             else:
                 userPathList = sublime.packages_path().rsplit(self.osDelimiter)
                 userPath = self.osDelimiter + self.osDelimiter.join((userPathList[1], userPathList[2], "Documents")) + self.osDelimiter
-                #userPath = self.osDelimiter + userPathList[1] + self.osDelimiter +userPathList[2] + self.osDelimiter + "Documents" + self.osDelimiter
                 if os.path.isdir(userPath + pathDic["path"]):
                     dirList.append(userPath + pathDic["path"])
 
