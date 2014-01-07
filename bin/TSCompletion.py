@@ -2,7 +2,7 @@ import os
 import logging
 import sublime, sublime_plugin
 
-class TSCompletionCommand(sublime_plugin.TextCommand):
+class TscompletionCommand(sublime_plugin.TextCommand):
 
 	def createTree(self):
 		return os.listdir(os.curdir + "./../../../../Users/SoiZen/Documents/work/office/ebzLoader/src/")

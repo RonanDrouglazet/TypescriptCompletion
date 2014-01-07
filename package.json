@@ -1,11 +1,9 @@
 {
   "name": "TSCompletion",
   "version": "0.1.0",
-  "TSCompletion_directory": "~/Desktop/work/TSCompletion/",
-  "ST3_directory": "~/Library/Application Support/Sublime Text 3/Packages/User/",
+  "dirPath_sublimeText3": "//Users/SoiZen/Library/Application Support/Sublime Text 3/Packages/User/",
   "devDependencies": {
     "grunt": "*",
-    "grunt-bg-shell": "*",
     "grunt-contrib-watch": "*"
   }
 }
