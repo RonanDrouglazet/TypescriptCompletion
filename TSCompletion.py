@@ -9,19 +9,31 @@ class TscompletionCommand(sublime_plugin.TextCommand):
     defaultFileEncoding = "utf-8"
     extInclude = ".ts" #TODO do a list
     extExclude = ".d.ts" #TODO do a list
-    moduleRegex = "module\s.+{"
+    moduleRegex = ".*module\s.+{"
+    classRegex = "\s*export class \w+"
+    methodRegex = "\s*(public|private|static)\s+(static\s+)*\w+\s*\("
 
     ## Variable plugin
     projectPathList = []
     tsFileList = []
     tsProjectDictionary = {}
+    tsClassList = []
+    classChoice = []
 
     ## Method plugin
     def run(self, edit):
+        # Reset
+        self.projectPathList = []
+        self.tsFileList = []
+        self.tsProjectDictionary = {}
+        self.tsClassList = []
+        self.classChoice = []
+
         self.projectPathList = self.getCurrentProjectPath()
         self.tsFileList = self.getTsFileList(self.projectPathList)
-        self.tsProjectDictionary = self.genProjectDictionary(self.tsFileList)
-        sublime.active_window().show_quick_panel(self.tsFileList, self.on_choice)
+
+        self.genProjectDictionary(self.tsFileList)
+        sublime.active_window().show_quick_panel(self.tsClassList, self.onClassChoice)
 
     def getCurrentProjectPath(self):
         projectFolderList = sublime.active_window().project_data()["folders"]
@@ -57,39 +69,69 @@ class TscompletionCommand(sublime_plugin.TextCommand):
         return fileList
 
     def genProjectDictionary(self, fileList):
-        projectDictionary = {}
         for file in fileList:
             tmpFile = open(file, 'r', -1, self.defaultFileEncoding)
-            self.extractModuleFromFile(tmpFile, projectDictionary)
-            self.extractClassFromFile(tmpFile, projectDictionary)
-            self.extractInterfaceFromFile(tmpFile, projectDictionary)
-            self.extractMethodFromFile(tmpFile, projectDictionary)
+            self.extractFromFile(tmpFile)
             tmpFile.close()
 
-        logging.warning("Class List: " + str(projectDictionary))
-        return projectDictionary
+    def extractFromFile(self, file):
+        # Module
+        patternModule = re.compile(self.moduleRegex)
+        patternModuleName = re.compile(r"\b(?!module|export|declare)\w+\b")
+        moduleName = ""
 
-    def extractModuleFromFile(self, file, dic):
-        patternM = re.compile(self.moduleRegex)
-        patternMN = re.compile(r"\b(?!module)\w+\b")
-        for matchedLine in patternM.findall( file.read() ):
-            topLevel = patternMN.findall(matchedLine)[0]
-            for moduleName in patternMN.findall(matchedLine):
-                if not moduleName in dic:
-                    if moduleName != topLevel:
-                        topLevel = topLevel + "." + moduleName
+        # Class
+        patternClass = re.compile(self.classRegex)
+        patternClassName = re.compile(r"\b(?!export|class|extends|implements)\w+\b")
+        className = ""
 
-                    dic[topLevel] = {}
+        # Method
+        patternMethod = re.compile(self.methodRegex)
+        patternMethodName = re.compile(r"\w+\s\w+\(.*\)")
+        methodName = ""
 
+        for line in file.readlines():
+            # Module
+            if patternModule.match(line):
+                # If a module are manually export into an other module and not simply module.submodule
+                if "export" in line:
+                    moduleName = moduleName + "." + ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
+                else:
+                    moduleName = ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
 
-    def extractClassFromFile(self, file, dic):
-        tabLines = file.readlines()
+            # Class
+            if patternClass.match(line):
+                className = moduleName + "." + patternClassName.findall(line)[0]
+                if not className in self.tsClassList:
+                    self.tsClassList.append(className)
+                if not className in self.tsProjectDictionary:
+                    self.tsProjectDictionary[className] = []
+                else:
+                    break
 
-    def extractInterfaceFromFile(self, file, dic):
-        tabLines = file.readlines()
+            # Method
+            if patternMethod.match(line):
+                methodName = patternMethodName.findall(line)[0]
+                if not methodName in self.tsProjectDictionary[className]:
+                    self.tsProjectDictionary[className].append(methodName)
 
-    def extractMethodFromFile(self, file, dic):
-        tabLines = file.readlines()
+    def onClassChoice(self, value):
+        #logging.warning(self.tsClassList[value])
+        #logging.warning(self.tsProjectDictionary[self.tsClassList[value]])
+        if value != -1:
+            self.classChoice = self.tsClassList[value]
+            #sublime.set_timeout(lambda: self.view.show_popup_menu(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
+            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
 
-    def on_choice(self, value):
-        logging.warning("Choosen value:" + self.tsFileList[value])
+    def onMethodChoice(self, value):
+        if value != -1:
+            methodString = self.tsProjectDictionary[self.classChoice][value]
+            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+        else:
+            sublime.error_message("Sorry, no method in class " + self.classChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
+
+class InserttscompletionCommand(sublime_plugin.TextCommand):
+
+    def run(self, edit, method):
+        caretPos = self.view.sel()[0].begin()
+        self.view.insert(edit, caretPos, method)
