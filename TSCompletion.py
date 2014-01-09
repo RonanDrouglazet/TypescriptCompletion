@@ -100,7 +100,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
 
         # Method
         patternMethod = re.compile(self.methodRegex)
-        patternMethodName = re.compile(r"\w+\s\w+\(.*\)")
+        patternMethodName = re.compile(r"\w+\s\w+\(.*")
         methodName = ""
 
         for line in file.readlines():
@@ -124,7 +124,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
 
             # Method
             if patternMethod.match(line):
-                methodName = patternMethodName.findall(line)[0]
+                methodName = patternMethodName.findall(line)[0].strip(" {")
                 if not methodName in self.tsProjectDictionary[className]:
                     self.tsProjectDictionary[className].append(methodName)
 
