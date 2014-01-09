@@ -12,6 +12,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
     moduleRegex = ".*module\s.+{"
     classRegex = "\s*export class \w+"
     methodRegex = "\s*(public|private|static)\s+(static\s+)*\w+\s*\("
+    userCustomProjectPath = ""
 
     ## Variable plugin
     projectPathList = []
@@ -36,25 +37,37 @@ class TscompletionCommand(sublime_plugin.TextCommand):
         sublime.active_window().show_quick_panel(self.tsClassList, self.onClassChoice)
 
     def getCurrentProjectPath(self):
-        projectFolderList = sublime.active_window().project_data()["folders"]
         dirList = []
 
-        for pathDic in projectFolderList:
+        if "folders" in sublime.active_window().project_data():
+            projectFolderList = sublime.active_window().project_data()["folders"]
 
-            # Absolute path => ok
-            if os.path.isdir(pathDic["path"]):
-                dirList.append(pathDic["path"])
+            for pathDic in projectFolderList:
 
-            # Relative path => not ok
+                # Absolute path => ok
+                if os.path.isdir(pathDic["path"]):
+                    dirList.append(pathDic["path"])
+
+                # Relative path => not ok
+                else:
+                    userPathList = sublime.packages_path().rsplit(os.sep)
+                    userPath = os.sep + os.sep.join((userPathList[1], userPathList[2], "Documents")) + os.sep
+                    if os.path.isdir(userPath + pathDic["path"]):
+                        dirList.append(userPath + pathDic["path"])
+        else:
+            if self.userCustomProjectPath != "":
+                dirList.append(self.userCustomProjectPath)
             else:
-                userPathList = sublime.packages_path().rsplit(os.sep)
-                userPath = os.sep + os.sep.join((userPathList[1], userPathList[2], "Documents")) + os.sep
-                if os.path.isdir(userPath + pathDic["path"]):
-                    dirList.append(userPath + pathDic["path"])
+                sublime.message_dialog("Sorry you are not in a project or the plugin does not find your project path \n\nPlease fill it on the bottom input and TSCompletion will remember this path for this session \n\nIf you are in a project so plugin have a bug, please leave issue and project conf on https://github.com/RonanDrouglazet/TSCompletion")
+                sublime.active_window().show_input_panel("Please fill TypeScript project path to analyse: ", "/Users/drouglazet/Desktop/work/TSCompletion/", self.onFillDone, None, None)
 
-        #logging.warning("Project Path: " + str(dirList))
+        logging.warning("Project Path: " + str(dirList))
 
         return dirList
+
+    def onFillDone(self, value):
+        self.userCustomProjectPath = value
+        sublime.active_window().run_command("tscompletion")
 
     def getTsFileList(self, pathList):
         fileList = []
@@ -125,7 +138,8 @@ class TscompletionCommand(sublime_plugin.TextCommand):
 
     def onMethodChoice(self, value):
         if value != -1:
-            methodString = self.tsProjectDictionary[self.classChoice][value]
+            patternMethodNake = re.compile("\s.+\)")
+            methodString = patternMethodNake.findall(self.tsProjectDictionary[self.classChoice][value])[0].lstrip()
             sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
         else:
             sublime.error_message("Sorry, no method in class " + self.classChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
