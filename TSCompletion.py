@@ -141,8 +141,6 @@ class TscompletionCommand(sublime_plugin.TextCommand):
                         self.tsClassList.append(className)
                     if not className in self.tsProjectDictionary:
                         self.tsProjectDictionary[className] = []
-                    else:
-                        break
                 if not methodName in self.tsProjectDictionary[className]:
                     self.tsProjectDictionary[className].append(methodName)
 

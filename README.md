@@ -16,14 +16,15 @@ Not ready yet, need more test on plugin (Windows / Linux platform for example)
 
     > //Users/yourname/Library/Application Support/Sublime Text 3/Packages/User/
 
-and you can go to the section "Usage".
+WARNING ! TSCompletion.py must be in the root of package / user, not in package / user / TSCompletion / . When it's ok, you can go to the section "Usage" below.
 
 2. OR Clone this repository anywhere, then fill "dirPath_sublimeText3" in package.json with your sublimeText3 user package path :
 
     > "dirPath_sublimeText3": "//Users/drouglazet/Library/Application Support/Sublime Text 3/Packages/User/"
 
-then call grunt:
+then call npm install follow by grunt:
 
+    > npm install
     > grunt
 
 this will copy the plugin in your package user directory, you can use grunt watch to if you want to test some modification
