@@ -126,7 +126,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
                 if not className in self.tsClassList:
                     self.tsClassList.append(className)
                 if not className in self.tsProjectDictionary:
-                    self.tsProjectDictionary[className] = []
+                    self.tsProjectDictionary[className] = ["<==== Return in class choice"]
                 else:
                     break
 
@@ -138,7 +138,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
                 if not className in self.tsClassList:
                     self.tsClassList.append(className)
                 if not className in self.tsProjectDictionary:
-                    self.tsProjectDictionary[className] = []
+                    self.tsProjectDictionary[className] = ["<==== Return in class choice"]
                 if not methodName in self.tsProjectDictionary[className]:
                     self.tsProjectDictionary[className].append(methodName)
 
@@ -152,6 +152,9 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
 
     def onMethodChoice(self, value):
+        if value == 0:
+            sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
+            return
         if value != -1:
             patternMethodNake = re.compile("\s.+\)")
             methodString = patternMethodNake.findall(self.tsProjectDictionary[self.classChoice][value])[0].lstrip()
