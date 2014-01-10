@@ -10,8 +10,8 @@ class TscompletionCommand(sublime_plugin.TextCommand):
     extInclude = ".ts" #TODO do a list
     extExclude = ".d.ts" #TODO do a list
     moduleRegex = ".*module\s.+{"
-    classRegex = "\s*export class \w+"
-    methodRegex = "\s*(public|private|static)\s+(static\s+)*\w+\s*\("
+    classRegex = "\s*(export )*class \w+"
+    methodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
     userCustomProjectPath = ""
 
     ## Variable plugin
@@ -99,7 +99,7 @@ class TscompletionCommand(sublime_plugin.TextCommand):
         # Module
         patternModule = re.compile(self.moduleRegex)
         patternModuleName = re.compile(r"\b(?!module|export|declare)\w+\b")
-        moduleName = ""
+        moduleName = "window"
 
         # Class
         patternClass = re.compile(self.classRegex)
@@ -134,13 +134,11 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             if patternMethod.match(line):
                 methodName = patternMethodName.findall(line)[0].strip(" {")
                 if className == "":
-                    if moduleName == "":
-                        moduleName = "window"
                     className = moduleName
-                    if not className in self.tsClassList:
-                        self.tsClassList.append(className)
-                    if not className in self.tsProjectDictionary:
-                        self.tsProjectDictionary[className] = []
+                if not className in self.tsClassList:
+                    self.tsClassList.append(className)
+                if not className in self.tsProjectDictionary:
+                    self.tsProjectDictionary[className] = []
                 if not methodName in self.tsProjectDictionary[className]:
                     self.tsProjectDictionary[className].append(methodName)
 
