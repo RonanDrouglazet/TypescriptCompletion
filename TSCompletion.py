@@ -30,10 +30,18 @@ class TscompletionCommand(sublime_plugin.TextCommand):
         self.tsClassList = []
         self.classChoice = []
 
-        self.projectPathList = self.getCurrentProjectPath()
-        self.tsFileList = self.getTsFileList(self.projectPathList)
+        try:
+            self.projectPathList = self.getCurrentProjectPath()
+            self.tsFileList = self.getTsFileList(self.projectPathList)
 
-        self.genProjectDictionary(self.tsFileList)
+            self.genProjectDictionary(self.tsFileList)
+
+        except ValueError:
+            logging.warning(self.projectPathList)
+            logging.warning(self.tsFileList)
+            logging.warning(self.tsProjectDictionary)
+            logging.warning(ValueError)
+
         sublime.active_window().show_quick_panel(self.tsClassList, self.onClassChoice)
 
     def getCurrentProjectPath(self):
@@ -125,6 +133,16 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             # Method
             if patternMethod.match(line):
                 methodName = patternMethodName.findall(line)[0].strip(" {")
+                if className == "":
+                    if moduleName == "":
+                        moduleName = "window"
+                    className = moduleName
+                    if not className in self.tsClassList:
+                        self.tsClassList.append(className)
+                    if not className in self.tsProjectDictionary:
+                        self.tsProjectDictionary[className] = []
+                    else:
+                        break
                 if not methodName in self.tsProjectDictionary[className]:
                     self.tsProjectDictionary[className].append(methodName)
 
@@ -133,7 +151,8 @@ class TscompletionCommand(sublime_plugin.TextCommand):
         #logging.warning(self.tsProjectDictionary[self.tsClassList[value]])
         if value != -1:
             self.classChoice = self.tsClassList[value]
-            #sublime.set_timeout(lambda: self.view.show_popup_menu(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
+            if len(self.tsProjectDictionary[self.classChoice]) == 0:
+                sublime.error_message("Sorry, no method in class " + self.classChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
             sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
 
     def onMethodChoice(self, value):
@@ -141,8 +160,6 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             patternMethodNake = re.compile("\s.+\)")
             methodString = patternMethodNake.findall(self.tsProjectDictionary[self.classChoice][value])[0].lstrip()
             sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
-        else:
-            sublime.error_message("Sorry, no method in class " + self.classChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
 
 class InserttscompletionCommand(sublime_plugin.TextCommand):
 
