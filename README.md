@@ -1,6 +1,6 @@
 # TSCompletion
 
-Sublim Text 3 (ST3) plugin for typescript auto completion (only tested on OSX actually). Inject method with a dynamic library build from your TypeScript project
+Sublim Text 3 (ST3) plugin for [TypeScript](http://www.typescriptlang.org/) auto completion with your own project method. A second feature are to inject method from a class choice with a dynamic library build from your TypeScript project
 
 It's one of my first Python's project, so write in a basic Python way, please fork me or leave comment / issue and help me improve this plugin !
 
@@ -8,26 +8,13 @@ It's one of my first Python's project, so write in a basic Python way, please fo
 
 ### With Package Control:
 
-Not ready yet, need more test on plugin (Windows / Linux platform for example)
+soon
 
-### Manually:
+### Manual:
 
-1. First way: Clone this repository directly in your sublime package, generally:
+Clone this repository in your sublime package, generally:
 
-    > //Users/yourname/Library/Application Support/Sublime Text 3/Packages/User/
-
-WARNING ! TSCompletion.py must be in the root of package / user, not in package / user / TSCompletion / . When it's ok, you can go to the section "Usage" below.
-
-2. OR Clone this repository anywhere, then fill "dirPath_sublimeText3" in package.json with your sublimeText3 user package path :
-
-    > "dirPath_sublimeText3": "//Users/drouglazet/Library/Application Support/Sublime Text 3/Packages/User/"
-
-then call npm install follow by grunt:
-
-    > npm install
-    > grunt
-
-this will copy the plugin in your package user directory, you can use grunt watch to if you want to test some modification
+    > /Users/yourname/Library/Application Support/Sublime Text 3/Packages/
 
 If you want to check if sublime text correctly load the plugin, you can show the console on view > show console and see a line:
 
@@ -35,18 +22,26 @@ If you want to check if sublime text correctly load the plugin, you can show the
 
 ## Usage
 
-If you are in a sublime project, TSCompletion will normally find alone your project path, and check all ts file.
-But, if you are not in a project, TSCompletion will ask you to fill a project path to analyse, juste one time for this session, TSCompletion will remember this path unless you quit this sublime window.
+### Auto completion:
+
+classic Sublime Text autocompletion popup was extend with your own project method automaticly if you are in a sublime project, OTHERWISE, to fill manually a project path to inspect for autocompletion, press:
+
+    cmd+shift+a
+
+Then it's ok for this session ! Sublime text auto completion will work as usual, but extend with your method, so more powerfull for you !!
+
+### Manual auto completion with class choice:
+
+    cmd+shift+a
 
 When you choose a class, then a method, TSCompletion will write for you the method name and it's arguments for you
-
-### key to run TSCompletion on OSX:
-
-    super+shift+a
 
 ## ToDo
 
 1. Test on other platform than OSX
-2. add a real auto-completion when we write ".", so key's "super+shift+a" active plugin and listen for a dot "."
-3. automatic detection of dot previous object type "object." to pre select class on the quickshearch panel
+2. add constructor support
+3. add interface support
+4. detect module of the current file and use it to auto complet static method from other module (not write absolute "path" like root.module1.module2.Static if we are already on module1 but write module2.Static)
+2. listen for dot ".", sublime doesn't do it.
+3. automatic detection of dot previous object type "object." to pre select class on the quickshearch panel and auto completion popup
 4. a lot of idea remaining !
