@@ -47,21 +47,12 @@ class TscompletionCommand(sublime_plugin.TextCommand):
     def getCurrentProjectPath(self):
         dirList = []
 
-        if "folders" in sublime.active_window().project_data():
-            projectFolderList = sublime.active_window().project_data()["folders"]
+        if len(self.view.window().folders()) > 0:
+            projectFolderList = self.view.window().folders()
 
-            for pathDic in projectFolderList:
-
-                # Absolute path => ok
-                if os.path.isdir(pathDic["path"]):
-                    dirList.append(pathDic["path"])
-
-                # Relative path => not ok
-                else:
-                    userPathList = sublime.packages_path().rsplit(os.sep)
-                    userPath = os.sep + os.sep.join((userPathList[1], userPathList[2], "Documents")) + os.sep
-                    if os.path.isdir(userPath + pathDic["path"]):
-                        dirList.append(userPath + pathDic["path"])
+            for path in projectFolderList:
+                if os.path.isdir(path):
+                    dirList.append(path)
         else:
             if self.userCustomProjectPath != "":
                 dirList.append(self.userCustomProjectPath)
