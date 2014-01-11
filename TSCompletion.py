@@ -3,103 +3,143 @@ import re
 import logging
 import sublime, sublime_plugin
 
+def TSC_IsTypeScript(filename):
+    return filename.endswith(".ts") & (not filename.endswith(".d.ts"))
+
+class TSC_Global:
+    TSC_ProjectDictionary = {}
+    TSC_DefaultFileEncoding = "utf-8"
+    TSC_ModuleRegex = ".*module\s.+{"
+    TSC_ModuleNameRegex = r"\b(?!module|export|declare)\w+\b"
+    TSC_ClassRegex = "\s*(export )*class \w+"
+    TSC_ClassNameRegex = r"\b(?!export|class|extends|implements)\w+\b"
+    TSC_MethodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
+    TSC_MethodNameRegex = r"\w+\s\w+\(.*"
+    TSC_UserCustomProjectPath = ""
+    TSC_AutoCompletList = []
+    TSC_PreviousText = "<==== Return in class choice"
+    TSC_ProjectPathList = []
+    TSC_TsFileList = []
+    TSC_TsClassList = []
+    TSC_ClassChoice = []
+
+    def clear():
+        TSC_Global.TSC_ProjectPathList = []
+        TSC_Global.TSC_TsFileList = []
+        TSC_Global.TSC_TsClassList = []
+        TSC_Global.TSC_ClassChoice = []
+        TSC_Global.TSC_AutoCompletList = []
+        TSC_Global.TSC_ProjectDictionary = {}
+
+    def genAutoCompletList():
+        reMethodNameNake = re.compile("\s\w+")
+        reMethodNameInsert = re.compile("\s.+\)")
+        for module in TSC_Global.TSC_ProjectDictionary:
+            for method in TSC_Global.TSC_ProjectDictionary[module]:
+                if method != TSC_Global.TSC_PreviousText:
+                    methodName = reMethodNameNake.findall(method)[0].strip()
+                    methodInsert = reMethodNameInsert.findall(method)[0].strip()
+                    TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
+                    TSC_Global.TSC_AutoCompletList.sort()
+
 class TscompletionCommand(sublime_plugin.TextCommand):
 
-    ## Constant plugin
-    defaultFileEncoding = "utf-8"
-    extInclude = ".ts" #TODO do a list
-    extExclude = ".d.ts" #TODO do a list
-    moduleRegex = ".*module\s.+{"
-    classRegex = "\s*(export )*class \w+"
-    methodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
-    userCustomProjectPath = ""
+    def run(self, edit):
+        ExtractEngine.run(False)
+        sublime.active_window().show_quick_panel(TSC_Global.TSC_TsClassList, self.onClassChoice)
 
-    ## Variable plugin
-    projectPathList = []
-    tsFileList = []
-    tsProjectDictionary = {}
-    tsClassList = []
-    classChoice = []
+    def onClassChoice(self, value):
+        if value != -1:
+            TSC_Global.TSC_ClassChoice = TSC_Global.TSC_TsClassList[value]
+            if len(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice]) == 0:
+                sublime.error_message("Sorry, no method in class " + TSC_Global.TSC_ClassChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
+            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice], self.onMethodChoice), 10)
+
+    def onMethodChoice(self, value):
+        if value == 0:
+            sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
+            return
+        if value != -1:
+            patternMethodNake = re.compile("\s.+\)")
+            methodString = patternMethodNake.findall(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice][value])[0].lstrip()
+            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+
+class ExtractEngine:
 
     ## Method plugin
-    def run(self, edit):
+    def run(autoComplete):
         # Reset
-        self.projectPathList = []
-        self.tsFileList = []
-        self.tsProjectDictionary = {}
-        self.tsClassList = []
-        self.classChoice = []
+        TSC_Global.clear()
 
         try:
-            self.projectPathList = self.getCurrentProjectPath()
-            self.tsFileList = self.getTsFileList(self.projectPathList)
+            TSC_Global.TSC_ProjectPathList = ExtractEngine.getCurrentProjectPath(autoComplete)
+            TSC_Global.TSC_TsFileList = ExtractEngine.getTsFileList(TSC_Global.TSC_ProjectPathList)
 
-            self.genProjectDictionary(self.tsFileList)
+            ExtractEngine.genProjectDictionary(TSC_Global.TSC_TsFileList)
+            TSC_Global.genAutoCompletList();
 
         except ValueError:
-            logging.warning(self.projectPathList)
-            logging.warning(self.tsFileList)
-            logging.warning(self.tsProjectDictionary)
+            logging.warning(TSC_Global.TSC_ProjectPathList)
+            logging.warning(TSC_Global.tsFileList)
+            logging.warning(TSC_Global.TSC_ProjectDictionary)
             logging.warning(ValueError)
 
-        sublime.active_window().show_quick_panel(self.tsClassList, self.onClassChoice)
-
-    def getCurrentProjectPath(self):
+    def getCurrentProjectPath(autoComplete):
         dirList = []
 
-        if len(self.view.window().folders()) > 0:
-            projectFolderList = self.view.window().folders()
+        if len(sublime.active_window().folders()) > 0:
+            projectFolderList = sublime.active_window().folders()
 
             for path in projectFolderList:
                 if os.path.isdir(path):
                     dirList.append(path)
         else:
-            if self.userCustomProjectPath != "":
-                dirList.append(self.userCustomProjectPath)
+            if TSC_Global.TSC_UserCustomProjectPath != "":
+                dirList.append(TSC_Global.TSC_UserCustomProjectPath)
             else:
-                sublime.message_dialog("Sorry you are not in a project or the plugin does not find your project path \n\nPlease fill it on the bottom input and TSCompletion will remember this path for this session \n\nIf you are in a project so plugin have a bug, please leave issue and project conf on https://github.com/RonanDrouglazet/TSCompletion")
-                sublime.active_window().show_input_panel("Please fill TypeScript project path to analyse: ", "/Users/drouglazet/Desktop/work/TSCompletion/", self.onFillDone, None, None)
-
-        logging.warning("Project Path: " + str(dirList))
+                if not autoComplete:
+                    sublime.message_dialog("Sorry you are not in a sublime project or the plugin does not find your project path \n\nPlease fill it on the bottom input and TSCompletion will remember this path for this session \n\nIf you are in a project so plugin have a bug, please leave issue and project conf on https://github.com/RonanDrouglazet/TSCompletion")
+                    sublime.active_window().show_input_panel("Please fill TypeScript project path to analyse: ", "/Users/yourname/etc..", ExtractEngine.onFillDone, None, None)
+                else:
+                    sublime.status_message("Sorry you are not in a sublime project or the plugin does not find your project path \n\nPlease fill it with cmd+shift+a if you want auto completion")
+                    logging.warning("TSCompletion: Sorry you are not in a project or the plugin does not find your project path \n\nPlease fill it with cmd+shift+a if you want auto completion")
 
         return dirList
 
-    def onFillDone(self, value):
-        self.userCustomProjectPath = value
+    def onFillDone(value):
+        TSC_Global.TSC_UserCustomProjectPath = value
         sublime.active_window().run_command("tscompletion")
 
-    def getTsFileList(self, pathList):
+    def getTsFileList(pathList):
         fileList = []
         for path in pathList:
             for root, dirs, files in os.walk(path):
                 for name in files:
-                    if name.endswith(self.extInclude) & (not name.endswith(self.extExclude)):
+                    if TSC_IsTypeScript(name):
                         fileList.append(os.path.join(root, name))
-
-        #logging.warning("File List: " + str(fileList))
 
         return fileList
 
-    def genProjectDictionary(self, fileList):
+    def genProjectDictionary(fileList):
         for file in fileList:
-            tmpFile = open(file, 'r', -1, self.defaultFileEncoding)
-            self.extractFromFile(tmpFile)
+            tmpFile = open(file, 'r', -1, TSC_Global.TSC_DefaultFileEncoding)
+            ExtractEngine.extractFromFile(tmpFile)
             tmpFile.close()
 
-    def extractFromFile(self, file):
+    def extractFromFile(file):
         # Module
-        patternModule = re.compile(self.moduleRegex)
-        patternModuleName = re.compile(r"\b(?!module|export|declare)\w+\b")
+        patternModule = re.compile(TSC_Global.TSC_ModuleRegex)
+        patternModuleName = re.compile(TSC_Global.TSC_ModuleNameRegex)
         moduleName = "window"
 
         # Class
-        patternClass = re.compile(self.classRegex)
-        patternClassName = re.compile(r"\b(?!export|class|extends|implements)\w+\b")
+        patternClass = re.compile(TSC_Global.TSC_ClassRegex)
+        patternClassName = re.compile(TSC_Global.TSC_ClassNameRegex)
         className = ""
 
         # Method
-        patternMethod = re.compile(self.methodRegex)
-        patternMethodName = re.compile(r"\w+\s\w+\(.*")
+        patternMethod = re.compile(TSC_Global.TSC_MethodRegex)
+        patternMethodName = re.compile(TSC_Global.TSC_MethodNameRegex)
         methodName = ""
 
         for line in file.readlines():
@@ -114,45 +154,43 @@ class TscompletionCommand(sublime_plugin.TextCommand):
             # Class
             if patternClass.match(line):
                 className = moduleName + "." + patternClassName.findall(line)[0]
-                if not className in self.tsClassList:
-                    self.tsClassList.append(className)
-                if not className in self.tsProjectDictionary:
-                    self.tsProjectDictionary[className] = ["<==== Return in class choice"]
-                else:
-                    break
+                ExtractEngine.insertClassInDic(className)
 
             # Method
             if patternMethod.match(line):
                 methodName = patternMethodName.findall(line)[0].strip(" {")
                 if className == "":
                     className = moduleName
-                if not className in self.tsClassList:
-                    self.tsClassList.append(className)
-                if not className in self.tsProjectDictionary:
-                    self.tsProjectDictionary[className] = ["<==== Return in class choice"]
-                if not methodName in self.tsProjectDictionary[className]:
-                    self.tsProjectDictionary[className].append(methodName)
+                ExtractEngine.insertClassInDic(className)
+                if not methodName in TSC_Global.TSC_ProjectDictionary[className]:
+                    TSC_Global.TSC_ProjectDictionary[className].append(methodName)
 
-    def onClassChoice(self, value):
-        #logging.warning(self.tsClassList[value])
-        #logging.warning(self.tsProjectDictionary[self.tsClassList[value]])
-        if value != -1:
-            self.classChoice = self.tsClassList[value]
-            if len(self.tsProjectDictionary[self.classChoice]) == 0:
-                sublime.error_message("Sorry, no method in class " + self.classChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
-            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(self.tsProjectDictionary[self.classChoice], self.onMethodChoice), 10)
-
-    def onMethodChoice(self, value):
-        if value == 0:
-            sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
-            return
-        if value != -1:
-            patternMethodNake = re.compile("\s.+\)")
-            methodString = patternMethodNake.findall(self.tsProjectDictionary[self.classChoice][value])[0].lstrip()
-            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+    def insertClassInDic(className):
+        if not className in TSC_Global.TSC_TsClassList:
+            TSC_Global.TSC_TsClassList.append(className)
+        if not className in TSC_Global.TSC_ProjectDictionary:
+            TSC_Global.TSC_ProjectDictionary[className] = [TSC_Global.TSC_PreviousText]
 
 class InserttscompletionCommand(sublime_plugin.TextCommand):
 
     def run(self, edit, method):
         caretPos = self.view.sel()[0].begin()
         self.view.insert(edit, caretPos, method)
+
+# Auto complet event
+class TsAutoCompletion(sublime_plugin.EventListener):
+
+    # Invoked when user save a file
+    def on_post_save(self, view):
+        ExtractEngine.run(True)
+
+    # Change autocomplete suggestions
+    def on_query_completions(self, view, prefix, locations):
+        current_file = view.file_name()
+        completions = []
+        if TSC_IsTypeScript(current_file):
+            if len(TSC_Global.TSC_AutoCompletList) == 0:
+                ExtractEngine.run(True)
+            return TSC_Global.TSC_AutoCompletList
+            completions.sort()
+        return (completions,sublime.INHIBIT_EXPLICIT_COMPLETIONS)
