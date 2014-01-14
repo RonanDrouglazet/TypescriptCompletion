@@ -1,6 +1,6 @@
 # TSCompletion
 
-Sublim Text 3 (ST3) plugin for [TypeScript](http://www.typescriptlang.org/) auto completion with your own project method. A second feature are to inject method from a class choice with a dynamic library build from your TypeScript project
+[TypeScript](http://www.typescriptlang.org/) Auto Completion with your project method name, and inject method manually with a module/class/method dictionary build from your TypeScript project
 
 It's one of my first Python's project, so write in a basic Python way, please fork me or leave comment / issue and help me improve this plugin !
 
@@ -8,7 +8,7 @@ It's one of my first Python's project, so write in a basic Python way, please fo
 
 ### With Package Control:
 
-soon
+search for TSCompletion on package control and you will find it ! 
 
 ### Manual:
 
