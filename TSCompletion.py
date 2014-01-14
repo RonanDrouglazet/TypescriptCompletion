@@ -38,7 +38,12 @@ class TSC_Global:
             for method in TSC_Global.TSC_ProjectDictionary[module]:
                 if method != TSC_Global.TSC_PreviousText:
                     methodName = reMethodNameNake.findall(method)[0].strip()
-                    methodInsert = reMethodNameInsert.findall(method)[0].strip()
+
+                    if len(reMethodNameInsert.findall(method)) > 0:
+                        methodInsert = reMethodNameInsert.findall(method)[0].strip()
+                    else:
+                        methodInsert = methodName + "()"
+
                     TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
                     TSC_Global.TSC_AutoCompletList.sort()
 
