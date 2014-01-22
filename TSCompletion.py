@@ -1,11 +1,77 @@
-import os
-import re
-import logging
+import os, re, logging, threading
 import sublime, sublime_plugin
 
-def TSC_IsTypeScript(filename):
-    return filename.endswith(".ts") & (not filename.endswith(".d.ts"))
+##############################
 
+# Manual call to TSCompletion
+class TscompletionCommand(sublime_plugin.TextCommand):
+
+    def run(self, edit):
+        ExtractEngine.run(False)
+        sublime.active_window().show_quick_panel(TSC_Global.TSC_TsClassList, self.onClassChoice)
+
+    def onClassChoice(self, value):
+        if value != -1:
+            TSC_Global.TSC_ClassChoice = TSC_Global.TSC_TsClassList[value]
+            if len(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice]) == 0:
+                sublime.error_message("Sorry, no method in class " + TSC_Global.TSC_ClassChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
+            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice], self.onMethodChoice), 10)
+
+    def onMethodChoice(self, value):
+        if value == 0:
+            sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
+            return
+        if value != -1:
+            patternMethodNake = re.compile("\s.+\)")
+            methodString = patternMethodNake.findall(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice][value])[0].lstrip()
+            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+
+##############################
+
+# Auto complet event
+class TsAutoCompletion(sublime_plugin.EventListener):
+
+    _collector_thread = None
+
+    def startThread(self):
+        if self._collector_thread != None:
+            self._collector_thread.stop()
+        self._collector_thread = TsCompletionThread(self)
+        self._collector_thread.start()
+
+    # Invoked when user save a file
+    def on_post_save(self, view):
+        self.startThread()
+
+    # Change autocomplete suggestions
+    def on_query_completions(self, view, prefix, locations):
+        current_file = view.file_name()
+        completions = []
+        if TSC_IsTypeScript(current_file):
+            if len(TSC_Global.TSC_AutoCompletList) == 0:
+                self.startThread()
+            return TSC_Global.TSC_AutoCompletList
+            completions.sort()
+        return (completions,sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+
+##############################
+
+# Thread for better perf
+class TsCompletionThread(threading.Thread):
+
+    def __init__(self, collector):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        ExtractEngine.run(True)
+
+    def stop(self):
+        if self.isAlive():
+            self._Thread__stop()
+
+##############################
+
+# TSCompletion Global var
 class TSC_Global:
     TSC_ProjectDictionary = {}
     TSC_DefaultFileEncoding = "utf-8"
@@ -47,28 +113,18 @@ class TSC_Global:
                     TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
                     TSC_Global.TSC_AutoCompletList.sort()
 
-class TscompletionCommand(sublime_plugin.TextCommand):
+##############################
 
-    def run(self, edit):
-        ExtractEngine.run(False)
-        sublime.active_window().show_quick_panel(TSC_Global.TSC_TsClassList, self.onClassChoice)
+# Insert method in view command
+class InserttscompletionCommand(sublime_plugin.TextCommand):
 
-    def onClassChoice(self, value):
-        if value != -1:
-            TSC_Global.TSC_ClassChoice = TSC_Global.TSC_TsClassList[value]
-            if len(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice]) == 0:
-                sublime.error_message("Sorry, no method in class " + TSC_Global.TSC_ClassChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
-            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice], self.onMethodChoice), 10)
+    def run(self, edit, method):
+        caretPos = self.view.sel()[0].begin()
+        self.view.insert(edit, caretPos, method)
 
-    def onMethodChoice(self, value):
-        if value == 0:
-            sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
-            return
-        if value != -1:
-            patternMethodNake = re.compile("\s.+\)")
-            methodString = patternMethodNake.findall(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice][value])[0].lstrip()
-            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+##############################
 
+# Extract class / method / module from file
 class ExtractEngine:
 
     ## Method plugin
@@ -176,26 +232,8 @@ class ExtractEngine:
         if not className in TSC_Global.TSC_ProjectDictionary:
             TSC_Global.TSC_ProjectDictionary[className] = [TSC_Global.TSC_PreviousText]
 
-class InserttscompletionCommand(sublime_plugin.TextCommand):
+##############################
 
-    def run(self, edit, method):
-        caretPos = self.view.sel()[0].begin()
-        self.view.insert(edit, caretPos, method)
-
-# Auto complet event
-class TsAutoCompletion(sublime_plugin.EventListener):
-
-    # Invoked when user save a file
-    def on_post_save(self, view):
-        ExtractEngine.run(True)
-
-    # Change autocomplete suggestions
-    def on_query_completions(self, view, prefix, locations):
-        current_file = view.file_name()
-        completions = []
-        if TSC_IsTypeScript(current_file):
-            if len(TSC_Global.TSC_AutoCompletList) == 0:
-                ExtractEngine.run(True)
-            return TSC_Global.TSC_AutoCompletList
-            completions.sort()
-        return (completions,sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+# Util
+def TSC_IsTypeScript(filename):
+    return filename.endswith(".ts") & (not filename.endswith(".d.ts"))
