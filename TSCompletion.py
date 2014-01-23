@@ -48,11 +48,20 @@ class TsAutoCompletion(sublime_plugin.EventListener):
         current_file = view.file_name()
         completions = []
         if TSC_IsTypeScript(current_file):
-            if len(TSC_Global.TSC_AutoCompletList) == 0:
+            if len(TSC_Global.TSC_AutoCompletListTuple) == 0:
                 self.startThread()
-            return TSC_Global.TSC_AutoCompletList
+            return TSC_Global.TSC_AutoCompletListTuple
             completions.sort()
         return (completions,sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+
+    def on_modified(self, view):
+        reg = view.line(view.sel()[0])
+        if TSC_IsTypeScript(view.file_name()) & view.substr(reg).endswith('..'):
+            if len(TSC_Global.TSC_AutoCompletListString) == 0:
+                ExtractEngine.run(True)
+            view.show_popup_menu(TSC_Global.TSC_AutoCompletListString, None)
+
+
 
 ##############################
 
@@ -82,7 +91,8 @@ class TSC_Global:
     TSC_MethodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
     TSC_MethodNameRegex = r"\w+\s\w+\(.*"
     TSC_UserCustomProjectPath = ""
-    TSC_AutoCompletList = []
+    TSC_AutoCompletListTuple = []
+    TSC_AutoCompletListString = []
     TSC_PreviousText = "<==== Return in class choice"
     TSC_ProjectPathList = []
     TSC_TsFileList = []
@@ -94,7 +104,8 @@ class TSC_Global:
         TSC_Global.TSC_TsFileList = []
         TSC_Global.TSC_TsClassList = []
         TSC_Global.TSC_ClassChoice = []
-        TSC_Global.TSC_AutoCompletList = []
+        TSC_Global.TSC_AutoCompletListTuple = []
+        TSC_Global.TSC_AutoCompletListString = []
         TSC_Global.TSC_ProjectDictionary = {}
 
     def genAutoCompletList():
@@ -110,8 +121,10 @@ class TSC_Global:
                     else:
                         methodInsert = methodName + "()"
 
-                    TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
-                    TSC_Global.TSC_AutoCompletList.sort()
+                    TSC_Global.TSC_AutoCompletListTuple.append((methodName + '\t' + module, methodInsert))
+                    TSC_Global.TSC_AutoCompletListString.append(methodName + '\t' + module)
+                    TSC_Global.TSC_AutoCompletListTuple.sort()
+                    TSC_Global.TSC_AutoCompletListString.sort()
 
 ##############################
 
