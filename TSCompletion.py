@@ -6,25 +6,59 @@ import sublime, sublime_plugin
 # Manual call to TSCompletion
 class TscompletionCommand(sublime_plugin.TextCommand):
 
+    tabPanel = []
+    objectPanel = {}
+
     def run(self, edit):
         ExtractEngine.run(False)
-        sublime.active_window().show_quick_panel(TSC_Global.TSC_TsClassList, self.onClassChoice)
+        self.tabPanel = []
+        self.objectPanel = TSC_Global.TSC_ProjectDictionary
 
-    def onClassChoice(self, value):
-        if value != -1:
-            TSC_Global.TSC_ClassChoice = TSC_Global.TSC_TsClassList[value]
-            if len(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice]) == 0:
-                sublime.error_message("Sorry, no method in class " + TSC_Global.TSC_ClassChoice + "\nIf you find a bug, leave issue on \nhttps://github.com/RonanDrouglazet/TSCompletion")
-            sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice], self.onMethodChoice), 10)
+        for module in self.objectPanel:
+            self.tabPanel.append("module " + module)
 
-    def onMethodChoice(self, value):
-        if value == 0:
+        self.tabPanel.sort()
+        sublime.active_window().show_quick_panel(self.tabPanel, self.onChoice)
+
+    def onChoice(self, value):
+        panelChoice = self.tabPanel[value]
+
+        if (value == 0) & (panelChoice == ".."):
             sublime.set_timeout(lambda: sublime.active_window().run_command("tscompletion"), 10)
             return
+
         if value != -1:
-            patternMethodNake = re.compile("\s.+\)")
-            methodString = patternMethodNake.findall(TSC_Global.TSC_ProjectDictionary[TSC_Global.TSC_ClassChoice][value])[0].lstrip()
-            sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+            type1 = re.compile(r"^\b(module|class)\b\s")
+            type2 = re.compile(r"^\b(function|static|private|public)\b\s")
+
+            if type1.match(panelChoice):
+                extractedName = panelChoice.replace("module", "").lstrip()
+                self.objectPanel = self.objectPanel[extractedName]
+                self.tabPanel = self.fillPanel(self.objectPanel)
+                sublime.set_timeout(lambda: sublime.active_window().show_quick_panel(self.tabPanel, self.onChoice), 10)
+                return
+
+            if type2.match(panelChoice):
+                patternMethodNake = re.compile("\s.+\)")
+                methodString = patternMethodNake.findall(panelChoice)[0].lstrip()
+                sublime.set_timeout(lambda: sublime.active_window().run_command("inserttscompletion", {"method": methodString}), 10)
+                return
+
+    def fillPanel(self, parentObject):
+        panel = []
+        for child in parentObject:
+            if (child != ".function") & (child != ".var"):
+                panel.append(child)
+            else:
+                for prop in parentObject[child]:
+                    if (not prop.startswith("var")) & (not prop.startswith("private")):
+                        panel.append(prop)
+
+        panel.insert(0, "..");
+        panel.sort()
+
+        return panel
+
 
 ##############################
 
@@ -82,49 +116,47 @@ class TsCompletionThread(threading.Thread):
 
 # TSCompletion Global var
 class TSC_Global:
-    TSC_ProjectDictionary = {}
+    TSC_ProjectDictionary = {"window": {}}
     TSC_DefaultFileEncoding = "utf-8"
     TSC_ModuleRegex = ".*module\s.+{"
-    TSC_ModuleNameRegex = r"\b(?!module|export|declare)\w+\b"
-    TSC_ClassRegex = "\s*(export )*class \w+"
-    TSC_ClassNameRegex = r"\b(?!export|class|extends|implements)\w+\b"
+    TSC_ModuleNameRegex = r"\b(?!export|declare|module)\w+\b"
+    TSC_ClassRegex = "\s*(export )*(class|interface) \w+"
+    TSC_ClassNameRegex = r"\b(?!export|extends|implements)\w+\b"
     TSC_MethodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
     TSC_MethodNameRegex = r"\w+\s\w+\(.*"
+    TSC_PropRegex = r"\s*(public|private|static|var)\s+\w+\s*:"
+    TSC_PropRegexName = r"\b\w+\.*\w+\b"
     TSC_UserCustomProjectPath = ""
     TSC_AutoCompletListTuple = []
     TSC_AutoCompletListString = []
-    TSC_PreviousText = "<==== Return in class choice"
     TSC_ProjectPathList = []
     TSC_TsFileList = []
-    TSC_TsClassList = []
-    TSC_ClassChoice = []
 
     def clear():
         TSC_Global.TSC_ProjectPathList = []
         TSC_Global.TSC_TsFileList = []
-        TSC_Global.TSC_TsClassList = []
-        TSC_Global.TSC_ClassChoice = []
         TSC_Global.TSC_AutoCompletListTuple = []
         TSC_Global.TSC_AutoCompletListString = []
-        TSC_Global.TSC_ProjectDictionary = {}
+        TSC_Global.TSC_ProjectDictionary = {"window": {}}
 
     def genAutoCompletList():
         reMethodNameNake = re.compile("\s\w+")
         reMethodNameInsert = re.compile("\s.+\)")
         for module in TSC_Global.TSC_ProjectDictionary:
-            for method in TSC_Global.TSC_ProjectDictionary[module]:
-                if method != TSC_Global.TSC_PreviousText:
-                    methodName = reMethodNameNake.findall(method)[0].strip()
+            for className in TSC_Global.TSC_ProjectDictionary[module]:
+                if (className != ".var") & (className != ".function"):
+                    for method in TSC_Global.TSC_ProjectDictionary[module][className][".function"]:
+                        methodName = reMethodNameNake.findall(method)[0].strip()
 
-                    if len(reMethodNameInsert.findall(method)) > 0:
-                        methodInsert = reMethodNameInsert.findall(method)[0].strip()
-                    else:
-                        methodInsert = methodName + "()"
+                        if len(reMethodNameInsert.findall(method)) > 0:
+                            methodInsert = reMethodNameInsert.findall(method)[0].strip()
+                        else:
+                            methodInsert = methodName + "()"
 
-                    TSC_Global.TSC_AutoCompletListTuple.append((methodName + '\t' + module, methodInsert))
-                    TSC_Global.TSC_AutoCompletListString.append(methodName + '\t' + module)
-                    TSC_Global.TSC_AutoCompletListTuple.sort()
-                    TSC_Global.TSC_AutoCompletListString.sort()
+                        TSC_Global.TSC_AutoCompletListTuple.append((methodName + '\t' + module, methodInsert))
+                        TSC_Global.TSC_AutoCompletListString.append(methodName + '\t' + module)
+                        TSC_Global.TSC_AutoCompletListTuple.sort()
+                        TSC_Global.TSC_AutoCompletListString.sort()
 
 ##############################
 
@@ -209,12 +241,16 @@ class ExtractEngine:
         # Class
         patternClass = re.compile(TSC_Global.TSC_ClassRegex)
         patternClassName = re.compile(TSC_Global.TSC_ClassNameRegex)
-        className = ""
+        className = "window"
 
         # Method
         patternMethod = re.compile(TSC_Global.TSC_MethodRegex)
         patternMethodName = re.compile(TSC_Global.TSC_MethodNameRegex)
         methodName = ""
+
+        # Propertie
+        patternProp = re.compile(TSC_Global.TSC_PropRegex);
+        patternPropName = re.compile(TSC_Global.TSC_PropRegexName);
 
         for line in file.readlines():
             # Module
@@ -224,26 +260,45 @@ class ExtractEngine:
                     moduleName = moduleName + "." + ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
                 else:
                     moduleName = ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
+                ExtractEngine.insertModuleInDic(moduleName)
+                className = moduleName
 
             # Class
             if patternClass.match(line):
-                className = moduleName + "." + patternClassName.findall(line)[0]
-                ExtractEngine.insertClassInDic(className)
+                className = patternClassName.findall(line)[0] + " " + patternClassName.findall(line)[1]
+                ExtractEngine.insertClassInDic(className, moduleName)
 
             # Method
             if patternMethod.match(line):
                 methodName = patternMethodName.findall(line)[0].strip(" {")
-                if className == "":
-                    className = moduleName
-                ExtractEngine.insertClassInDic(className)
-                if not methodName in TSC_Global.TSC_ProjectDictionary[className]:
-                    TSC_Global.TSC_ProjectDictionary[className].append(methodName)
+                if className == moduleName:
+                    TSC_Global.TSC_ProjectDictionary[moduleName][".function"].append(methodName)
+                else:
+                    TSC_Global.TSC_ProjectDictionary[moduleName][className][".function"].append(methodName)
 
-    def insertClassInDic(className):
-        if not className in TSC_Global.TSC_TsClassList:
-            TSC_Global.TSC_TsClassList.append(className)
-        if not className in TSC_Global.TSC_ProjectDictionary:
-            TSC_Global.TSC_ProjectDictionary[className] = [TSC_Global.TSC_PreviousText]
+
+            if patternProp.match(line):
+                listMatch = patternPropName.findall(line)
+                if len(listMatch) > 2:
+                    #tmp = ""
+                    if className == moduleName:
+                        TSC_Global.TSC_ProjectDictionary[moduleName][".var"].append(listMatch[0] + " " + listMatch[1] + " : " + listMatch[2])
+                    else:
+                        TSC_Global.TSC_ProjectDictionary[moduleName][className][".var"].append(listMatch[0] + " " + listMatch[1] + " : " + listMatch[2])
+                    #for className in TSC_Global.TSC_ProjectDictionary:
+                    #    if className.endswith(listMatch[2]):
+                    #        tmp = listMatch[1] + ": " + listMatch[2]
+                    #        logging.warning(listMatch[1] + ": " + listMatch[2])
+                    #if tmp == "":
+                    #    logging.warning("#" + listMatch[1] + ": " + listMatch[2])
+
+    def insertClassInDic(className, module):
+        if not className in TSC_Global.TSC_ProjectDictionary[module]:
+            TSC_Global.TSC_ProjectDictionary[module][className] = {".function": [], ".var": []}
+
+    def insertModuleInDic(moduleName):
+        if not moduleName in TSC_Global.TSC_ProjectDictionary:
+            TSC_Global.TSC_ProjectDictionary[moduleName] = {".function": [], ".var": []}
 
 ##############################
 
