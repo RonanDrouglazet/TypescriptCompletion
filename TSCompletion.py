@@ -80,7 +80,7 @@ class TSC_Global:
     TSC_ClassRegex = "\s*(export )*class \w+"
     TSC_ClassNameRegex = r"\b(?!export|class|extends|implements)\w+\b"
     TSC_MethodRegex = "\s*(public|private|static|function)\s+(static\s+)*\w+\s*\("
-    TSC_MethodNameRegex = r"\w+\s\w+\(.*"
+    TSC_MethodNameRegex = r"\w+\s\w+\s*\(.*"
     TSC_UserCustomProjectPath = ""
     TSC_AutoCompletList = []
     TSC_PreviousText = "<==== Return in class choice"
