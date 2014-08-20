@@ -113,7 +113,6 @@ class TSC_Global:
                         methodInsert = methodName + "()"
 
                     methodInsert = re.sub( reMethodArgs , '(${1:\\1})' , methodInsert )
-                    print(methodInsert)
                     
                     TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
                     TSC_Global.TSC_AutoCompletList.sort()
