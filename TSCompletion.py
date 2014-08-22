@@ -100,6 +100,8 @@ class TSC_Global:
     def genAutoCompletList():
         reMethodNameNake = re.compile("\s\w+")
         reMethodNameInsert = re.compile("\s.+\)")
+        reMethodArgs = re.compile("\((.*)\)")
+
         for module in TSC_Global.TSC_ProjectDictionary:
             for method in TSC_Global.TSC_ProjectDictionary[module]:
                 if method != TSC_Global.TSC_PreviousText:
@@ -110,6 +112,8 @@ class TSC_Global:
                     else:
                         methodInsert = methodName + "()"
 
+                    methodInsert = re.sub( reMethodArgs , '(${1:\\1})' , methodInsert )
+                    
                     TSC_Global.TSC_AutoCompletList.append((methodName + '\t' + module, methodInsert))
                     TSC_Global.TSC_AutoCompletList.sort()
 
