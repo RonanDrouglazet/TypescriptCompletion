@@ -143,11 +143,8 @@ class ExtractEngine:
             ExtractEngine.genProjectDictionary(TSC_Global.TSC_TsFileList)
             TSC_Global.genAutoCompletList();
 
-        except ValueError:
-            logging.warning(TSC_Global.TSC_ProjectPathList)
-            logging.warning(TSC_Global.tsFileList)
-            logging.warning(TSC_Global.TSC_ProjectDictionary)
-            logging.warning(ValueError)
+        except:
+            print("TypescriptCompletion - error on run")
 
     def getCurrentProjectPath(autoComplete):
         dirList = []
@@ -167,7 +164,7 @@ class ExtractEngine:
                     sublime.active_window().show_input_panel("Please fill TypeScript project path to analyse: ", "/Users/yourname/etc..", ExtractEngine.onFillDone, None, None)
                 else:
                     sublime.status_message("Sorry you are not in a sublime project or the plugin does not find your project path \n\nPlease fill it with cmd+shift+a if you want auto completion")
-                    logging.warning("TSCompletion: Sorry you are not in a project or the plugin does not find your project path \n\nPlease fill it with cmd+shift+a if you want auto completion")
+                    print("TSCompletion: Sorry you are not in a project or the plugin does not find your project path \n\nPlease fill it with cmd+shift+a if you want auto completion")
 
         return dirList
 
@@ -207,28 +204,46 @@ class ExtractEngine:
         patternMethodName = re.compile(TSC_Global.TSC_MethodNameRegex)
         methodName = ""
 
-        for line in file.readlines():
-            # Module
-            if patternModule.match(line):
-                # If a module are manually export into an other module and not simply module.submodule
-                if "export" in line:
-                    moduleName = moduleName + "." + ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
-                else:
-                    moduleName = ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
+        try:
+            for line in file.readlines():
+                # Module
+                try:
+                    if patternModule.match(line):
+                        # If a module are manually export into an other module and not simply module.submodule
+                        if "export" in line:
+                            moduleName = moduleName + "." + ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
+                        else:
+                            moduleName = ".".join(patternModuleName.findall(patternModule.findall(line)[0]))
+                except:
+                    print('TypescriptCompletion - error while extracting moduleName');
+                    print(line);
 
-            # Class
-            if patternClass.match(line):
-                className = moduleName + "." + patternClassName.findall(line)[0]
-                ExtractEngine.insertClassInDic(className)
+                # Class
+                try:
+                    if patternClass.match(line):
+                        className = moduleName + "." + patternClassName.findall(line)[0]
+                        ExtractEngine.insertClassInDic(className)
+                except:
+                    print('TypescriptCompletion - error while extracting className');
+                    print(line);
 
-            # Method
-            if patternMethod.match(line):
-                methodName = patternMethodName.findall(line)[0].strip(" {")
-                if className == "":
-                    className = moduleName
-                ExtractEngine.insertClassInDic(className)
-                if not methodName in TSC_Global.TSC_ProjectDictionary[className]:
-                    TSC_Global.TSC_ProjectDictionary[className].append(methodName)
+                # Method
+                try:
+                    if patternMethod.match(line):
+                        methodName = patternMethodName.findall(line)[0].strip(" {")
+                        if className == "":
+                            className = moduleName
+                        ExtractEngine.insertClassInDic(className)
+                        if not methodName in TSC_Global.TSC_ProjectDictionary[className]:
+                            TSC_Global.TSC_ProjectDictionary[className].append(methodName)
+                except:
+                    print('TypescriptCompletion - error while extracting methodName');
+                    print(line);
+
+
+        except:
+            print('TypescriptCompletion - error while readlines on file')
+
 
     def insertClassInDic(className):
         if not className in TSC_Global.TSC_TsClassList:
